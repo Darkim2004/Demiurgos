@@ -1,63 +1,22 @@
-import ollama
-import os
-from typing import Any, Callable, List, Mapping, Union
+"""Demiurgos command-line entry point."""
 
+from dotenv import load_dotenv
 
-ChatMessage = Union[Mapping[str, Any], ollama.Message]
-ToolFunction = Callable[..., int]
-
-def add(a: int, b: int) -> int:
-    """Add two integers."""
-    return a + b
-
-AVAILABLE_TOOLS: Mapping[str, ToolFunction] = {
-    "add": add,
-}
+from agent import run_agent
+from models.factory import create_provider
 
 
 def main() -> None:
+    """Read one message, run the configured agent, and print its response."""
+
+    load_dotenv()
     print("Hello from demiurgos!")
     message = input("Enter a message: ")
 
-    messages: List[ChatMessage] = [
-        {
-            "role": "user",
-            "content": message,
-        }
-    ]
+    provider = create_provider()
+    response = run_agent(message, provider)
 
-    response = ollama.chat(
-            model = os.getenv("MODEL", "qwen3:8b"),
-            messages= messages,
-            tools=[add]
-    )
-
-    messages.append(response.message)
-
-    for i in response.message.tool_calls or ():
-        tool_name = i.function.name
-        tool_args = i.function.arguments
-        tool_function = AVAILABLE_TOOLS.get(tool_name)
-
-        if tool_function is None:
-            print(f"Unknown tool call: {tool_name}")
-        else:
-            tool_result = tool_function(**tool_args)
-            print(f"Tool call: {tool_name}({tool_args}) -> {tool_result}")
-
-        messages.append({
-            "role": "tool",
-            "name": tool_name,
-            "content": str(tool_result),
-        })
-
-    final_response = ollama.chat(
-        model=os.getenv("MODEL", "qwen3:8b"),
-        messages=messages,
-    )
-
-    print("Agent response:", final_response.message.content)
-
+    print("Agent response:", response)
 
 
 if __name__ == "__main__":
